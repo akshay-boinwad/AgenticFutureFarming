@@ -91,12 +91,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.featureCard}
-            activeOpacity={0.75}
-            onPress={() =>
-              alert('Crop Advisor will be available in a future update.')
-            }
-          >
+              style={styles.featureCard}
+              activeOpacity={0.75}
+              onPress={() => router.push('/crop-advisor')}
+            >
             <Text style={styles.featureIcon}>🌾</Text>
             <Text style={styles.featureTitle}>Crop Advisor</Text>
             <Text style={styles.featureDescription}>
