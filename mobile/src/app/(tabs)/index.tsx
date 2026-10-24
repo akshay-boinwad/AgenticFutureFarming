@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
+import { getFarmingRecommendations } from '../../services/farmingRecommendations';
+
 import {
   SafeAreaView,
   ScrollView,
@@ -31,6 +33,10 @@ export default function HomeScreen() {
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState(false);
 
+const recommendations =
+  weather && forecast.length > 0
+    ? getFarmingRecommendations(weather, forecast)
+    : [];
   
 useEffect(() => {
     let active = true;
@@ -230,6 +236,68 @@ useEffect(() => {
             ))}
           </ScrollView>
         )}
+
+        <Text style={styles.sectionTitle}>
+                  Farming Recommendations
+                </Text>
+
+                <Text style={styles.recommendationIntro}>
+                  Weather-based suggestions for your farm
+                </Text>
+
+                {weatherLoading || forecastLoading ? (
+                  <Text style={styles.mutedText}>
+                    Preparing farming recommendations...
+                  </Text>
+                ) : weatherError || forecastError ? (
+                  <Text style={styles.mutedText}>
+                    Weather data is incomplete. Some recommendations may be unavailable.
+                  </Text>
+                ) : recommendations.length === 0 ? (
+                  <Text style={styles.mutedText}>
+                    No recommendations available right now.
+                  </Text>
+                ) : (
+                  <View style={{ gap: 12 }}>
+                    {recommendations.map((item) => (
+                      <View key={item.id} style={styles.recommendationCard}>
+                        <View style={styles.recommendationHeader}>
+                          <Text style={styles.recommendationTitle}>
+                            {item.category === 'irrigation'
+                              ? '💧'
+                              : item.category === 'rain'
+                              ? '🌧️'
+                              : '🌱'}{' '}
+                            {item.title}
+                          </Text>
+
+                          <Text
+                            style={[
+                              styles.priorityBadge,
+                              item.priority === 'high'
+                                ? styles.highPriority
+                                : item.priority === 'medium'
+                                ? styles.mediumPriority
+                                : styles.lowPriority,
+                            ]}
+                          >
+                            {item.priority.toUpperCase()}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.recommendationMessage}>
+                          {item.message}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={styles.recommendationDisclaimer}>
+                  These are general, rule-based suggestions. Check soil moisture,
+                  crop type, local conditions, and official weather alerts before
+                  making farming decisions.
+              </Text>
 
         <Text style={[styles.sectionTitle, styles.toolsHeading]}>
           Smart farming tools
@@ -496,5 +564,73 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 1,
     marginTop: 28,
+  },
+  recommendationIntro: {
+    fontSize: 12,
+    color: '#657568',
+    marginTop: -8,
+    marginBottom: 14,
+  },
+
+  recommendationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2EADF',
+  },
+
+  recommendationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+
+  recommendationTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#263D2A',
+    lineHeight: 21,
+  },
+
+  priorityBadge: {
+    fontSize: 9,
+    fontWeight: '800',
+    overflow: 'hidden',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+
+  highPriority: {
+    backgroundColor: '#FCE8E6',
+    color: '#B3261E',
+  },
+
+  mediumPriority: {
+    backgroundColor: '#FFF1D6',
+    color: '#8A5700',
+  },
+
+  lowPriority: {
+    backgroundColor: '#E8F5E9',
+    color: '#2E7D32',
+  },
+
+  recommendationMessage: {
+    fontSize: 12,
+    lineHeight: 19,
+    color: '#536854',
+    marginTop: 10,
+  },
+
+  recommendationDisclaimer: {
+    fontSize: 10,
+    lineHeight: 16,
+    color: '#7B857B',
+    marginTop: 12,
+    marginBottom: 24,
   },
 });
