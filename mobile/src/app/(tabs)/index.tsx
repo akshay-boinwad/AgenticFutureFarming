@@ -1,5 +1,4 @@
-import React from 'react';
-
+import React, { useEffect, useState } from 'react';
 
 import {
   SafeAreaView,
@@ -10,12 +9,82 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { router } from 'expo-router';
+
+import {
+  getCurrentWeather,
+  getSevenDayForecast,
+  getWeatherDescription,
+  type WeatherData,
+  type DailyForecast,
+} from '../../services/weather';
 
 const GREEN = '#2E7D32';
 const BACKGROUND = '#F7FAF5';
 
 export default function HomeScreen() {
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState(false);
+  const [forecast, setForecast] = useState<DailyForecast[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(true);
+  const [forecastError, setForecastError] = useState(false);
+
+  
+useEffect(() => {
+    let active = true;
+
+    async function loadWeather() {
+      try {
+        const result = await getCurrentWeather(16.7050, 74.2433);
+
+        if (active) {
+          setWeather(result);
+          setWeatherError(false);
+        }
+      } catch (error) {
+        console.error('Weather loading failed:', error);
+
+        if (active) {
+          setWeatherError(true);
+        }
+      } finally {
+        if (active) {
+          setWeatherLoading(false);
+        }
+      }
+    }
+
+    async function loadForecast() {
+      try {
+        const result = await getSevenDayForecast(16.7050, 74.2433);
+
+        if (active) {
+          setForecast(result);
+          setForecastError(false);
+        }
+      } catch (error) {
+        console.error('Forecast loading failed:', error);
+
+        if (active) {
+          setForecastError(true);
+        }
+      } finally {
+        if (active) {
+          setForecastLoading(false);
+        }
+      }
+    }
+
+    void loadWeather();
+    void loadForecast();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const openCropDoctor = () => {
     router.push('/crop-doctor');
   };
@@ -60,17 +129,107 @@ export default function HomeScreen() {
           </View>
         </View>
 
+
         <Text style={styles.sectionTitle}>Weather overview</Text>
 
         <View style={styles.weatherCard}>
-          <View>
-            <Text style={styles.weatherLocation}>📍 Your farm</Text>
-            <Text style={styles.temperature}>--°C</Text>
-            <Text style={styles.mutedText}>Weather data coming soon</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.weatherLocation}>
+              📍 Kolhapur, Maharashtra
+            </Text>
+
+            {weatherLoading ? (
+              <Text style={styles.mutedText}>
+                Loading current weather...
+              </Text>
+            ) : weatherError || !weather ? (
+              <Text style={styles.mutedText}>
+                Unable to load weather. Check your internet and try again.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.temperature}>
+                  {Math.round(weather.temperature)}°C
+                </Text>
+
+                <Text style={styles.mutedText}>
+                  {getWeatherDescription(weather.weatherCode)}
+                </Text>
+
+                <Text style={{ marginTop: 12, color: '#425747', lineHeight: 24 }}>
+                  Humidity: {weather.humidity}%
+                  {'\n'}Wind: {weather.windSpeed} km/h
+                  {'\n'}Precipitation: {weather.precipitation} mm
+                </Text>
+              </>
+            )}
           </View>
 
           <Text style={styles.weatherIcon}>🌤️</Text>
         </View>
+
+        <Text style={styles.sectionTitle}>7-Day Forecast</Text>
+
+        {forecastLoading ? (
+          <Text style={styles.mutedText}>Loading forecast...</Text>
+        ) : forecastError ? (
+          <Text style={styles.mutedText}>
+            Forecast unavailable. Please try again later.
+          </Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {forecast.map((day) => (
+              <View
+                key={day.date}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2EADF',
+                  padding: 14,
+                  marginRight: 10,
+                  minWidth: 125,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#425747', fontWeight: '600' }}>
+                  {new Date(`${day.date}T12:00:00`).toLocaleDateString(
+                    'en-IN',
+                    { weekday: 'short', day: 'numeric', month: 'short' }
+                  )}
+                </Text>
+
+                <Text style={{ fontSize: 25, marginVertical: 8 }}>
+                  {day.weatherCode >= 95
+                    ? '⛈️'
+                    : [61, 63, 65, 66, 67, 80, 81, 82].includes(day.weatherCode)
+                    ? '🌧️'
+                    : [51, 53, 55, 56, 57].includes(day.weatherCode)
+                    ? '🌦️'
+                    : day.weatherCode === 0
+                    ? '☀️'
+                    : '🌤️'}
+                </Text>
+
+                <Text style={{ fontWeight: '700', color: '#263D2A' }}>
+                  {Math.round(day.maxTemperature)}° / {Math.round(day.minTemperature)}°
+                </Text>
+
+                <Text style={{ color: '#657568', marginTop: 8 }}>
+                  Rain: {day.rainProbability}%
+                </Text>
+
+                <Text style={{ color: '#657568', marginTop: 4 }}>
+                  {day.precipitation} mm
+                </Text>
+
+                <Text style={{ color: '#657568', marginTop: 6, fontSize: 12 }}>
+                  {getWeatherDescription(day.weatherCode)}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
 
         <Text style={[styles.sectionTitle, styles.toolsHeading]}>
           Smart farming tools
