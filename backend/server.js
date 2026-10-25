@@ -5,7 +5,6 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 const app = express();
-// Hey this is pavan pawar
 const PORT = 5000;
 const ML_SERVICE_URL = 'http://127.0.0.1:8000';
 
@@ -36,7 +35,7 @@ const upload = multer({
   },
 });
 
-// Backend health check
+// Root endpoint
 app.get('/', (req, res) => {
   res.json({
     message: 'Future Farming Backend is running!',
@@ -44,7 +43,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Check whether the Python ML service is reachable
+// Backend and ML service health check
 app.get('/api/health', async (req, res) => {
   try {
     const response = await axios.get(
@@ -64,6 +63,57 @@ app.get('/api/health', async (req, res) => {
       mlService: 'unavailable',
       message:
         'The Python ML service could not be reached. Check that it is running on port 8000.',
+    });
+  }
+});
+
+/**
+ * Crop recommendation
+ * Forwards all seven soil and weather inputs to FastAPI.
+ */
+app.post('/api/crop/recommend', async (req, res) => {
+  try {
+    const {
+      nitrogen,
+      phosphorus,
+      potassium,
+      temperature,
+      humidity,
+      ph,
+      rainfall,
+    } = req.body;
+
+    const mlResponse = await axios.post(
+      `${ML_SERVICE_URL}/api/crop/recommend`,
+      {
+        nitrogen,
+        phosphorus,
+        potassium,
+        temperature,
+        humidity,
+        ph,
+        rainfall,
+      },
+      { timeout: 10000 }
+    );
+
+    return res.status(200).json(mlResponse.data);
+  } catch (error) {
+    console.error(
+      'Crop recommendation failed:',
+      error.response?.data || error.message
+    );
+
+    if (error.response) {
+      return res.status(error.response.status).json(
+        error.response.data
+      );
+    }
+
+    return res.status(503).json({
+      success: false,
+      message:
+        'The crop recommendation service is unavailable. Please check that the Python ML service is running.',
     });
   }
 });

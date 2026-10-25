@@ -1,13 +1,30 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from PIL import Image, UnidentifiedImageError
+from pathlib import Path
 from io import BytesIO
+
+import joblib
+import pandas as pd
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from pydantic import BaseModel, Field
+from PIL import Image, UnidentifiedImageError
 
 app = FastAPI(
     title="Future Farming ML Service",
-    description="Crop disease detection API",
-    version="1.0.0",
+    description="Crop recommendation and crop disease API",
+    version="1.1.0",
 )
 
+# Load the trained crop recommendation model.
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "models" / "crop_recommendation_model.joblib"
+
+try:
+    model_artifact = joblib.load(MODEL_PATH)
+    model = model_artifact["model"]
+    feature_names = model_artifact["features"]
+except Exception as exc:
+    raise RuntimeError(
+        f"Could not load crop recommendation model at {MODEL_PATH}"
+    ) from exc
 
 @app.get("/")
 def health_check():
@@ -19,7 +36,10 @@ def health_check():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "crop_recommendation_model_loaded": True,
+    }
 
 
 @app.post("/api/crop/analyze")
@@ -51,14 +71,67 @@ async def analyze_crop(image: UploadFile = File(...)):
             detail="The uploaded file is not a valid image.",
         )
 
-    # The image is validated, but no trained model is loaded yet.
+    # Image validation only; a disease-classification model
+    # has not been integrated yet.
     return {
         "success": True,
         "message": "Image received and validated successfully.",
         "prediction": None,
         "model_connected": False,
         "next_step": (
-            "Connect a trained crop disease classification model "
-            "to generate real predictions."
+            "A trained crop disease classification model "
+            "is still required for disease predictions."
+        ),
+    }
+
+
+class CropRecommendationRequest(BaseModel):
+    nitrogen: float = Field(ge=0, le=200)
+    phosphorus: float = Field(ge=0, le=200)
+    potassium: float = Field(ge=0, le=200)
+    temperature: float = Field(ge=-10, le=60)
+    humidity: float = Field(ge=0, le=100)
+    ph: float = Field(ge=0, le=14)
+    rainfall: float = Field(ge=0, le=5000)
+
+
+@app.post("/api/crop/recommend")
+def recommend_crop(request: CropRecommendationRequest):
+    features = pd.DataFrame(
+        [
+            {
+                "N": request.nitrogen,
+                "P": request.phosphorus,
+                "K": request.potassium,
+                "temperature": request.temperature,
+                "humidity": request.humidity,
+                "ph": request.ph,
+                "rainfall": request.rainfall,
+            }
+        ],
+        columns=[
+            "N",
+            "P",
+            "K",
+            "temperature",
+            "humidity",
+            "ph",
+            "rainfall",
+        ],
+    )
+
+    prediction = str(model.predict(features)[0])
+
+    return {
+        "success": True,
+        "model_connected": True,
+        "message": "Crop recommendation generated successfully.",
+        "recommendation": prediction,
+        "inputs": request.dict(),
+        "model_type": type(model).__name__,
+        "disclaimer": (
+            "This is a dataset-based prediction, not a guarantee "
+            "of crop suitability. Verify local soil, weather, "
+            "season, and agricultural guidance before planting."
         ),
     }
